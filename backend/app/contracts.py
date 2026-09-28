@@ -229,3 +229,27 @@ def stub_deps(llm: LLM | None = None) -> AgentDeps:
         answer_filings_question=stub_answer_filings_question,
         llm=llm,
     )
+
+
+def real_deps(llm: LLM | None = None) -> AgentDeps:
+    """Phase 2 wiring: the real workstream implementations. Imports are lazy so this
+    module stays importable (and stub-only tests stay offline) without them."""
+    from app.agents.filings import answer_filings_question, summarize_filings
+    from app.agents.market import answer_market_question, get_market_snapshot
+    from app.ingest import ingest_recent_filings, retrieve
+    from app.sources.edgar import resolve_company
+
+    if llm is None:
+        from app.llm import AnthropicLLM
+
+        llm = AnthropicLLM()
+    return AgentDeps(
+        get_market_snapshot=get_market_snapshot,
+        answer_market_question=answer_market_question,
+        resolve_company=resolve_company,
+        ingest_recent_filings=ingest_recent_filings,
+        retrieve=retrieve,
+        summarize_filings=summarize_filings,
+        answer_filings_question=answer_filings_question,
+        llm=llm,
+    )
