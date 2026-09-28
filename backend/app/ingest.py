@@ -5,11 +5,15 @@ from __future__ import annotations
 import logging
 import re
 import warnings
-from datetime import datetime
+from datetime import UTC, date, datetime
 
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+from chromadb.api.models.Collection import Collection
 
-from app.models import FilingMeta
+from app import vectorstore
+from app.models import Chunk, DataSourceError, FilingMeta
+from app.sources import edgar
+from app.tracing import traceable
 from app.vectorstore import ChunkRecord
 
 log = logging.getLogger(__name__)
@@ -108,3 +112,41 @@ def build_records(ticker: str, filing: FilingMeta, sections: dict[str, str],
                 "section": section, "url": filing.primary_doc_url, "chunk_idx": idx,
                 "retrieved_at": retrieved_at.isoformat()}))
     return records
+
+
+@traceable(run_type="chain", name="ingest.ingest_recent_filings")
+def ingest_recent_filings(ticker: str, *, client: edgar.EdgarClient | None = None,
+                          collection: Collection | None = None,
+                          today: date | None = None) -> list[FilingMeta]:
+    """Fetch + store the selected filings. Idempotent: stored accession_nos are not re-fetched.
+    A filing whose document fails is skipped (and retried on the next call)."""
+    client = client or edgar.default_client()
+    col = collection if collection is not None else vectorstore.get_collection()
+    symbol = edgar.normalize_ticker(ticker)
+    cik, _ = edgar.resolve_company(symbol, client=client)
+    as_of = today or datetime.now(UTC).date()
+    filings = edgar.select_filings(client.get_submissions(cik), cik, as_of)
+    stored: list[FilingMeta] = []
+    for filing in filings:
+        if vectorstore.has_accession(col, filing.accession_no):
+            stored.append(filing)
+            continue
+        try:
+            html = client.get_document(filing.primary_doc_url)
+        except DataSourceError as e:
+            log.warning("skipping %s %s: %s", filing.form_type, filing.accession_no, e)
+            continue
+        now = datetime.now(UTC)
+        records = build_records(symbol, filing, filing_sections(filing, html), now)
+        vectorstore.add_records(col, records)
+        stored.append(filing)
+    if filings and not stored:
+        raise DataSourceError("sec_edgar", f"no filings could be fetched for {symbol}")
+    return stored
+
+
+@traceable(run_type="tool", name="ingest.retrieve")
+def retrieve(ticker: str, query: str, k: int = 6, form_type: str | None = None, *,
+             collection: Collection | None = None) -> list[Chunk]:
+    col = collection if collection is not None else vectorstore.get_collection()
+    return vectorstore.query_chunks(col, edgar.normalize_ticker(ticker), query, k, form_type)
