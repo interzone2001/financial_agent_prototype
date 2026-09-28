@@ -48,23 +48,25 @@ def add_records(collection: Collection, records: list[ChunkRecord]) -> int:
     return len(records)
 
 
-def _where(ticker: str, form_type: str | None) -> dict:
+def _where(cik: str, form_type: str | None) -> dict:
     if form_type is None:
-        return {"ticker": ticker}
-    return {"$and": [{"ticker": ticker}, {"form_type": form_type}]}
+        return {"cik": cik}
+    return {"$and": [{"cik": cik}, {"form_type": form_type}]}
 
 
-def query_chunks(collection: Collection, ticker: str, query: str, k: int = 6,
+def query_chunks(collection: Collection, cik: str, ticker: str, query: str, k: int = 6,
                  form_type: str | None = None) -> list[Chunk]:
+    """Filters by CIK (shared across a company's ticker/share classes); `ticker` is stamped
+    onto the returned Chunks as the requested ticker, not the one stored at ingest time."""
     if k < 1:
         return []
-    res = collection.query(query_texts=[query], n_results=k, where=_where(ticker, form_type))
-    return [_to_chunk(cid, doc, meta)
+    res = collection.query(query_texts=[query], n_results=k, where=_where(cik, form_type))
+    return [_to_chunk(cid, doc, meta, ticker)
             for cid, doc, meta in zip(res["ids"][0], res["documents"][0], res["metadatas"][0])]
 
 
-def _to_chunk(chunk_id: str, text: str, m: dict) -> Chunk:
-    return Chunk(chunk_id=chunk_id, ticker=m["ticker"], text=text, source=SourceRef(
+def _to_chunk(chunk_id: str, text: str, m: dict, ticker: str) -> Chunk:
+    return Chunk(chunk_id=chunk_id, ticker=ticker, text=text, source=SourceRef(
         provider="sec_edgar", url=m["url"], retrieved_at=datetime.fromisoformat(m["retrieved_at"]),
         accession_no=m["accession_no"], form_type=m["form_type"],
         filed_date=date.fromisoformat(m["filed_date"]), section=m["section"], chunk_id=chunk_id))

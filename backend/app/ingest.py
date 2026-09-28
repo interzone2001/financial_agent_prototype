@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from chromadb.api.models.Collection import Collection
 
 from app import vectorstore
-from app.models import Chunk, DataSourceError, FilingMeta
+from app.models import Chunk, DataSourceError, FilingMeta, TickerNotFoundError
 from app.sources import edgar
 from app.tracing import traceable
 from app.vectorstore import ChunkRecord
@@ -147,6 +147,13 @@ def ingest_recent_filings(ticker: str, *, client: edgar.EdgarClient | None = Non
 
 @traceable(run_type="tool", name="ingest.retrieve")
 def retrieve(ticker: str, query: str, k: int = 6, form_type: str | None = None, *,
-             collection: Collection | None = None) -> list[Chunk]:
+             collection: Collection | None = None, client: edgar.EdgarClient | None = None,
+             ) -> list[Chunk]:
+    """Filters by CIK so a company's share classes (same CIK, different ticker) share chunks."""
     col = collection if collection is not None else vectorstore.get_collection()
-    return vectorstore.query_chunks(col, edgar.normalize_ticker(ticker), query, k, form_type)
+    symbol = edgar.normalize_ticker(ticker)
+    try:
+        cik, _ = edgar.resolve_company(symbol, client=client)
+    except TickerNotFoundError:
+        return []
+    return vectorstore.query_chunks(col, cik, symbol, query, k, form_type)
