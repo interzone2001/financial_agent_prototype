@@ -1,4 +1,4 @@
-import { Fragment, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { api, errorMessage } from "../api";
 import { parseInline, sourceFor, sourceKey, type Registry } from "../citations";
 import type { ChatAnswer, Route } from "../types";
@@ -41,6 +41,10 @@ export function ChatPanel({ threadId, ticker, registry, onAnswer }: {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const ready = ticker !== null;
+  const logRef = useRef<HTMLOListElement>(null);
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  useEffect(() => { const el = logRef.current; if (el) el.scrollTop = el.scrollHeight; }, [items, busy]);
 
   async function send(e?: FormEvent) {
     e?.preventDefault();
@@ -51,13 +55,15 @@ export function ChatPanel({ threadId, ticker, registry, onAnswer }: {
     setBusy(true);
     try {
       const answer = await api.chat(threadId, msg);
+      if (!alive.current) return;
       onAnswer(answer); // registry update + message append batch into one render
       setItems((xs) => [...xs, { role: "assistant", answer }]);
     } catch (err) {
+      if (!alive.current) return;
       setItems((xs) => [...xs, { role: "error", text: errorMessage(err) }]);
       setInput(msg); // let them resend without retyping
     } finally {
-      setBusy(false);
+      if (alive.current) setBusy(false);
     }
   }
   function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -67,7 +73,7 @@ export function ChatPanel({ threadId, ticker, registry, onAnswer }: {
   return (
     <section className="chat" aria-label="Follow-up chat">
       <h2>Ask about {ticker ?? "a security"}</h2>
-      <ol className="chat-log" aria-live="polite">
+      <ol className="chat-log" aria-live="polite" ref={logRef}>
         {items.length === 0 && (
           <li className="muted">{ready ? "e.g. What did they say about supply-chain risk?" : "Generate a report, then ask follow-up questions here."}</li>
         )}

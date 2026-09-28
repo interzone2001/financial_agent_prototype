@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import App from "./App";
 import { json, sampleReport, src10k } from "./test/sample";
@@ -102,4 +102,49 @@ it("chat reuses report citation numbers and appends new sources to the list", as
   expect([...answer.querySelectorAll(".cite > a")].map((a) => a.textContent)).toEqual(["[2]", "[4]"]);
   expect(answer.textContent).toContain("SEC filings"); // route badge
   expect(document.getElementById("src-4")!.textContent).toContain("Item 2. MD&A");
+});
+
+it("chat log auto-scrolls to the newest message", async () => {
+  const orig = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollHeight");
+  Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 500 });
+  try {
+    route({ "/api/sessions": [session], "/api/report": [() => json(200, sampleReport)],
+      "/api/chat": [() => json(200, { text: "Risk [K:item-1a:0].",
+        citations: [src10k], route: "filings", warnings: [], disclaimer: "x" })] });
+    render(<App />);
+    await submit("AAPL");
+    await screen.findByText("Apple Inc. (AAPL)");
+    await ask("what are the risks?");
+    await waitFor(() => expect(document.querySelector(".msg-assistant")).toBeTruthy());
+    const log = document.querySelector(".chat-log") as HTMLOListElement;
+    expect(log.scrollTop).toBe(500);
+  } finally {
+    if (orig) Object.defineProperty(HTMLElement.prototype, "scrollHeight", orig);
+    else delete (HTMLElement.prototype as unknown as { scrollHeight?: number }).scrollHeight;
+  }
+});
+
+it("stale chat answer from a remounted ChatPanel doesn't leak into the new report's registry", async () => {
+  let resolveChat!: (r: Response) => void;
+  const second = { ...sampleReport, generated_at: "2026-09-28T19:00:00Z" };
+  route({
+    "/api/sessions": [session],
+    "/api/report": [() => json(200, sampleReport), () => json(200, second)],
+    "/api/chat": [() => new Promise<Response>((r) => { resolveChat = r; })],
+  });
+  render(<App />);
+  await submit("AAPL");
+  await screen.findByText("Apple Inc. (AAPL)");
+  await ask("risks and growth?");
+  await submit("AAPL"); // second report while chat still pending; ChatPanel remounts
+  expect(await screen.findByText(/What did they say about supply-chain risk/)).toBeTruthy();
+
+  const srcQ = { ...src10k, chunk_id: "Q:item-2:0", section: "Item 2. MD&A" };
+  await act(async () => {
+    resolveChat(json(200, { text: "Risk [K:item-1a:0]; growth [Q:item-2:0].",
+      citations: [src10k, srcQ], route: "filings", warnings: [], disclaimer: "x" }));
+  });
+
+  expect(document.getElementById("src-4")).toBeNull();
+  expect(document.querySelector(".msg-assistant")).toBeNull();
 });
