@@ -260,7 +260,7 @@ All errors return `ErrorResponse`. CORS allows `http://localhost:5173`. Backend 
 | Input validation | `guard_in` + Pydantic | Ticker regex; `resolve_company` existence check before any LLM/AV spend; chat ≤1000 chars; injection heuristics (e.g. "ignore previous", "system prompt", role-play markers) → refuse |
 | Scope filter | router | `off_topic` route → polite refusal, no agent call |
 | No investment advice | `guard_out` | Regex (`\b(buy|sell|hold|strong buy|price target|should (invest|purchase)|overweight|underweight)\b` in advisory phrasing) on every Claim + chat text; chat also gets a Haiku yes/no check. Offending claim dropped / chat answer replaced with refusal + warning. Disclaimer always present |
-| Grounding | `guard_out` | Every `Claim.citations` id ∈ `citation_index`; filings chat answers must have ≥1 citation with `chunk_id`. Violations dropped + warning |
+| Grounding | `guard_out` | Every `Claim.citations` id ∈ `citation_index` (violations dropped + warning). Filings chat answers with no `chunk_id` citation are kept but flagged with a warning (Phase 2 decision: an unverified-flagged answer beats none) |
 
 ## 5. Rules for every session
 
@@ -524,3 +524,12 @@ This section refines §6.5. It does **not** change §3 contracts or the API; eve
 | Chroma embedding model download | Warm once in Phase 0 |
 | Contract drift between sessions | Frozen contracts + stop-and-ask rule |
 | Time overrun | Cut order: Haiku advice check → both-route → 8-K section labels → UI hover cards |
+
+## 10. Known limitations (Phase 2)
+
+- SEC unreachable ⇒ whole report 503 (SEC is the ticker-existence authority, checked first).
+- SEC throttles with HTTP 403, surfaced as a generic `DataSourceError`.
+- EDGAR client throttle is per-process and not thread-safe across concurrent reports.
+- Superseded 10-Qs / old 8-Ks remain retrievable in a long-lived `DATA_DIR`.
+- A filing yielding 0 chunks is still listed in `FilingsSummary.filings`.
+- Chat citations only cover chunks retrieved in that turn.

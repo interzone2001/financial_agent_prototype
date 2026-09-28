@@ -120,7 +120,8 @@ def build_graph(deps: AgentDeps, checkpointer, *, llm_advice_check: bool = True
         return {"report": report.model_dump(mode="json"), "history": []}
 
     def router(state: GraphState) -> dict:
-        msgs = router_messages(state["ticker"], state["company_name"], state["message"])
+        msgs = router_messages(state["ticker"], state["company_name"], state["message"],
+                               state.get("history") or [])
         return {"route": deps.llm.parse("fast", ROUTER_SYSTEM, msgs, RouteDecision).route}
 
     def chat_answer(state: GraphState) -> dict:
