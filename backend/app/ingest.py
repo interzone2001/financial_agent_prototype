@@ -99,18 +99,29 @@ def filing_sections(filing: FilingMeta, html: str) -> dict[str, str]:
 def build_records(ticker: str, filing: FilingMeta, sections: dict[str, str],
                   retrieved_at: datetime, max_chunks: int = MAX_CHUNKS_PER_FILING,
                   ) -> list[ChunkRecord]:
+    """Chunks each section first, then takes chunks round-robin by index across sections so a
+    huge early section can't starve a later one out of the max_chunks budget."""
+    per_section = {section: pieces for section, body in sections.items()
+                   if (pieces := chunk_text(body))}
     records: list[ChunkRecord] = []
-    for section, body in sections.items():
-        slug = slugify(section)
-        for idx, piece in enumerate(chunk_text(body)):
+    capped = False
+    for idx in range(max((len(p) for p in per_section.values()), default=0)):
+        for section, pieces in per_section.items():
+            if idx >= len(pieces):
+                continue
             if len(records) >= max_chunks:
-                log.warning("capped %s at %d chunks", filing.accession_no, max_chunks)
-                return records
-            records.append(ChunkRecord(f"{filing.accession_no}:{slug}:{idx}", piece, {
+                capped = True
+                break
+            slug = slugify(section)
+            records.append(ChunkRecord(f"{filing.accession_no}:{slug}:{idx}", pieces[idx], {
                 "ticker": ticker, "cik": filing.cik, "accession_no": filing.accession_no,
                 "form_type": filing.form_type, "filed_date": filing.filed_date.isoformat(),
                 "section": section, "url": filing.primary_doc_url, "chunk_idx": idx,
                 "retrieved_at": retrieved_at.isoformat()}))
+        if capped:
+            break
+    if capped:
+        log.warning("capped %s at %d chunks", filing.accession_no, max_chunks)
     return records
 
 

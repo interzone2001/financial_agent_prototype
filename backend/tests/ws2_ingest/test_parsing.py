@@ -76,3 +76,13 @@ def test_records_ids_metadata_cap_and_empty(caplog):
         capped = ingest.build_records("AAPL", EIGHT_K, {"A": long, "B": long}, NOW, max_chunks=3)
     assert len(capped) == 3 and "capped" in caplog.text
     assert ingest.build_records("AAPL", EIGHT_K, {ingest.FULL_TEXT: ""}, NOW) == []
+
+def test_cap_is_distributed_round_robin_across_sections(caplog):
+    """A huge early section must not starve a later section out of the whole budget."""
+    huge = " ".join(f"Sentence {i} about risk factors and disclosures." for i in range(3000))
+    small = " ".join(f"Sentence {i} about margins." for i in range(120))
+    with caplog.at_level(logging.WARNING):
+        capped = ingest.build_records("AAPL", EIGHT_K, {"A": huge, "B": small}, NOW, max_chunks=4)
+    assert "capped" in caplog.text
+    sections_present = {r.metadata["section"] for r in capped}
+    assert sections_present == {"A", "B"}
