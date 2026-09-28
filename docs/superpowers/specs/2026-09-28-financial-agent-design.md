@@ -476,6 +476,19 @@ maps chunk ids → numbered sources correctly and links to URL; api client handl
 
 **Done when:** the above pass and the page works end-to-end against the stub API.
 
+#### 6.5.1 UI design addendum (approved 2026-09-28)
+
+This section refines §6.5. It does **not** change §3 contracts or the API; everything below is client-side.
+
+- **Layout:** a sticky header (app name · ticker form · disclaimer, always visible in both themes). Below it, two panes: the report on the left (about 65%, scrolls independently) and the chat on the right (about 35%, full height, stays put). Below 900px the panes stack (report, then chat) and the page scrolls normally. No horizontal scroll at 375px.
+- **Theme:** "terminal-lite". Dark by default; light palette under `prefers-color-scheme: light`. All colours are CSS variables. Tabular numbers throughout; mono font for tickers, prices and citation marks. Price change shows ▲/▼ as well as green/red.
+- **Citations: one registry per session.** Report claims are numbered first, by first appearance in section order. Chat answers reuse existing numbers and append new sources to the same numbered **Sources** list, which is rendered once at the bottom of the report pane. Registry key = `SourceRef.chunk_id`, falling back to `url` for Alpha Vantage sources. The registry resets when a new report is generated.
+- **Chat inline markers:** answer text contains `[<chunk_id>]` (per §6.3). The UI parses these into `[n]` citation marks. Unknown ids stay as literal text. Citations not mentioned inline show as `[n]` chips under the answer. Each answer carries a `route` badge.
+- **`[n]` interaction:** hover or keyboard focus opens a popover (form · section · filed date · "Open on sec.gov ↗"; for Alpha Vantage: provider · retrieved time); Escape closes it. Click scrolls to the matching Sources entry and flashes it. An id missing from `citation_index` still gets a number, and its entry reads "Source unavailable".
+- **Loading:** "Fetching quote & filings…" plus a *cosmetic* timed stage line (resolving ticker → quote → reading filings → summarising) with elapsed seconds, and skeleton cards. The API doesn't stream, so the stages are an estimate, not real progress.
+- **Chat gating:** the input is disabled until a report exists. A 409 (for example, after a server restart) still shows "Generate a report first".
+- **Cut order** (extends §9): popover (fall back to a `title` attribute) → timed stages (fall back to static copy) → light theme.
+
 ---
 
 ## 7. Phase 0 deliverables (integrator, before sessions start)
