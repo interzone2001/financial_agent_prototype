@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="640" viewBox="0 0 800 640" role="img" aria-label="LangGraph structure: START to guard_in. guard_in branches conditionally: report mode fans out in parallel to market_node and filings_node, which join at compose; chat mode goes to router then chat_answer; a refused injection goes straight to guard_out. compose and chat_answer both lead to guard_out, then END.">
+      <style>
+    :root { --bg:#f5f6f8; --surface:#ffffff; --fg:#1a2130; --muted:#5d6677; --line:#c9ced8; --report:#0b7580; --chat:#a8520a; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#12161d; --surface:#1a2029; --fg:#e4e8ef; --muted:#99a2b2; --line:#3a4352; --report:#52c2cc; --chat:#eea35a; }
+    }
+    .bg { fill: var(--surface); }
+    .n-box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+    .n-report { stroke: var(--report); } .n-chat { stroke: var(--chat); }
+    .n-name { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; font-weight: 600; fill: var(--fg); }
+    .n-sub { font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 10.5px; fill: var(--muted); }
+    .term { fill: var(--bg); stroke: var(--muted); stroke-width: 1.2; }
+    .term-t, .lbl, .frame-t { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .term-t { font-size: 12px; fill: var(--muted); }
+    .e { fill: none; stroke-width: 1.8; }
+    .e-report { stroke: var(--report); } .e-chat { stroke: var(--chat); } .e-both { stroke: var(--muted); }
+    .cond { stroke-dasharray: 6 4; }
+    .lbl { font-size: 10.5px; }
+    .l-report { fill: var(--report); } .l-chat { fill: var(--chat); } .l-both { fill: var(--muted); }
+    .frame { fill: none; stroke: var(--line); stroke-dasharray: 2 4; stroke-width: 1.2; }
+    .frame-t { font-size: 10.5px; fill: var(--muted); }
+    .mk-report { fill: var(--report); } .mk-chat { fill: var(--chat); } .mk-both { fill: var(--muted); }
+  </style>
+      <rect class="bg" x="0" y="0" width="800" height="640" rx="10"/>
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-report" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-chat" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-both" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+
+      <!-- checkpoint boundary -->
+      <rect class="frame" x="22" y="84" width="770" height="490" rx="8"/>
+      <text class="frame-t" x="34" y="104">StateGraph(GraphState)</text>
+      <text class="frame-t" x="34" y="119">SqliteSaver checkpoint per thread_id</text>
+
+      <!-- edges -->
+      <path class="e e-both" d="M400,63 V101" marker-end="url(#ab)"/>
+      <!-- guard_in fan-out (report) -->
+      <path class="e e-report cond" d="M350,157 V195 H160 V231" marker-end="url(#ar)"/>
+      <path class="e e-report cond" d="M400,157 V231" marker-end="url(#ar)"/>
+      <text class="lbl l-report" x="255" y="187" text-anchor="middle">mode = report · parallel</text>
+      <!-- guard_in → router (chat) -->
+      <path class="e e-chat cond" d="M450,157 V195 H650 V231" marker-end="url(#ac)"/>
+      <text class="lbl l-chat" x="560" y="187" text-anchor="middle">mode = chat</text>
+      <!-- guard_in → guard_out (refused) -->
+      <path class="e e-chat cond" d="M498,130 H770 V520 H500" marker-end="url(#ac)"/>
+      <text class="lbl l-chat" x="760" y="478" text-anchor="end">injection refused</text>
+      <text class="lbl l-chat" x="760" y="493" text-anchor="end">(skip router)</text>
+      <!-- join -->
+      <path class="e e-report" d="M160,287 V325 H240 V361" marker-end="url(#ar)"/>
+      <path class="e e-report" d="M400,287 V325 H320 V361" marker-end="url(#ar)"/>
+      <text class="lbl l-report" x="150" y="350" text-anchor="end">join: waits</text>
+      <text class="lbl l-report" x="150" y="364" text-anchor="end">for both</text>
+      <!-- router → chat_answer -->
+      <path class="e e-chat" d="M650,287 V361" marker-end="url(#ac)"/>
+      <text class="lbl l-chat" x="640" y="320" text-anchor="end">market · filings</text>
+      <text class="lbl l-chat" x="640" y="335" text-anchor="end">both · off_topic</text>
+      <!-- into guard_out -->
+      <path class="e e-report" d="M280,417 V455 H350 V491" marker-end="url(#ar)"/>
+      <text class="lbl l-report" x="290" y="447">Report</text>
+      <path class="e e-chat" d="M650,417 V455 H450 V491" marker-end="url(#ac)"/>
+      <text class="lbl l-chat" x="560" y="447" text-anchor="middle">ChatAnswer</text>
+      <path class="e e-both" d="M400,547 V593" marker-end="url(#ab)"/>
+
+      <!-- terminals -->
+      <rect class="term" x="350" y="33" width="100" height="30" rx="15"/>
+      <text class="term-t" x="400" y="52" text-anchor="middle">START</text>
+      <rect class="term" x="350" y="595" width="100" height="30" rx="15"/>
+      <text class="term-t" x="400" y="614" text-anchor="middle">END</text>
+
+      <!-- nodes -->
+      <g>
+        <rect class="n-box" x="302" y="103" width="196" height="54" rx="6"/>
+        <text class="n-name" x="400" y="126" text-anchor="middle">guard_in</text>
+        <text class="n-sub" x="400" y="143" text-anchor="middle">SEC ticker check · injection check</text>
+      </g>
+      <g>
+        <rect class="n-box n-report" x="62" y="233" width="196" height="54" rx="6"/>
+        <text class="n-name" x="160" y="256" text-anchor="middle">market_node</text>
+        <text class="n-sub" x="160" y="273" text-anchor="middle">Alpha Vantage quote + overview</text>
+      </g>
+      <g>
+        <rect class="n-box n-report" x="302" y="233" width="196" height="54" rx="6"/>
+        <text class="n-name" x="400" y="256" text-anchor="middle">filings_node</text>
+        <text class="n-sub" x="400" y="273" text-anchor="middle">EDGAR → Chroma → summary</text>
+      </g>
+      <g>
+        <rect class="n-box n-chat" x="552" y="233" width="196" height="54" rx="6"/>
+        <text class="n-name" x="650" y="256" text-anchor="middle">router</text>
+        <text class="n-sub" x="650" y="273" text-anchor="middle">Haiku → RouteDecision</text>
+      </g>
+      <g>
+        <rect class="n-box n-report" x="182" y="363" width="196" height="54" rx="6"/>
+        <text class="n-name" x="280" y="386" text-anchor="middle">compose</text>
+        <text class="n-sub" x="280" y="403" text-anchor="middle">build Report · no LLM</text>
+      </g>
+      <g>
+        <rect class="n-box n-chat" x="552" y="363" width="196" height="54" rx="6"/>
+        <text class="n-name" x="650" y="386" text-anchor="middle">chat_answer</text>
+        <text class="n-sub" x="650" y="403" text-anchor="middle">market / filings agents (Sonnet)</text>
+      </g>
+      <g>
+        <rect class="n-box" x="302" y="493" width="196" height="54" rx="6"/>
+        <text class="n-name" x="400" y="516" text-anchor="middle">guard_out</text>
+        <text class="n-sub" x="400" y="533" text-anchor="middle">advice + grounding checks</text>
+      </g>
+    </svg>

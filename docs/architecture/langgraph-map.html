@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Financial Agent Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one centered column; the graph figure is the page, the table is the reference under it. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --fg: #1a2130;
+  --muted: #5d6677;
+  --line: #c9ced8;
+  --report: #0b7580;
+  --chat: #a8520a;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a2029; --fg: #e4e8ef; --muted: #99a2b2; --line: #3a4352;
+    --report: #52c2cc; --chat: #eea35a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --fg: #e4e8ef; --muted: #99a2b2; --line: #3a4352;
+  --report: #52c2cc; --chat: #eea35a; color-scheme: dark;
+}
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 960px; margin: 0 auto; padding-inline: 16px; padding-block: 32px 48px; display: grid; gap: 28px; }
+header { display: grid; gap: 6px; }
+h1 { font-family: var(--font-mono); font-weight: 600; font-size: 1.5rem; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.muted { color: var(--muted); }
+code { font-family: var(--font-mono); font-size: 0.9em; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.85rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.swatch { width: 26px; height: 0; border-top: 2px solid; display: inline-block; }
+.sw-report { border-color: var(--report); }
+.sw-chat { border-color: var(--chat); }
+.sw-cond { border-color: var(--muted); border-top-style: dashed; }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
+.fig-scroll { overflow-x: auto; }
+figure svg { display: block; width: 100%; min-width: 620px; height: auto; color: var(--fg); }
+figcaption { font-size: 0.88rem; color: var(--muted); max-width: 72ch; }
+.n-box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.n-report { stroke: var(--report); }
+.n-chat { stroke: var(--chat); }
+.n-name { font-family: var(--font-mono); font-size: 14px; font-weight: 600; fill: var(--fg); }
+.n-sub { font-family: var(--font-body); font-size: 10.5px; fill: var(--muted); }
+.term { fill: var(--bg); stroke: var(--muted); stroke-width: 1.2; }
+.term-t { font-family: var(--font-mono); font-size: 12px; fill: var(--muted); }
+.e { fill: none; stroke-width: 1.8; }
+.e-report { stroke: var(--report); }
+.e-chat { stroke: var(--chat); }
+.e-both { stroke: var(--muted); }
+.cond { stroke-dasharray: 6 4; }
+.lbl { font-family: var(--font-mono); font-size: 10.5px; }
+.l-report { fill: var(--report); }
+.l-chat { fill: var(--chat); }
+.l-both { fill: var(--muted); }
+.frame { fill: none; stroke: var(--line); stroke-dasharray: 2 4; stroke-width: 1.2; }
+.frame-t { font-family: var(--font-mono); font-size: 10.5px; fill: var(--muted); }
+.mk-report { color: var(--report); }
+.mk-chat { color: var(--chat); }
+.mk-both { color: var(--muted); }
+.paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.path { border-top: 3px solid; padding-top: 10px; display: grid; gap: 6px; min-width: 0; }
+.path.report { border-color: var(--report); }
+.path.chat { border-color: var(--chat); }
+.path h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.path ol { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: 0.92rem; }
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 0.88rem; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; }
+td:first-child { font-family: var(--font-mono); font-weight: 500; white-space: nowrap; }
+.pill { display: inline-block; font-size: 0.72rem; font-family: var(--font-mono); padding: 1px 8px; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+.pill.report { color: var(--report); border-color: var(--report); }
+.pill.chat { color: var(--chat); border-color: var(--chat); }
+.pill.both { color: var(--muted); border-color: var(--line); }
+footer { font-size: 0.8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Financial Agent Graph</h1>
+    <p class="muted">The LangGraph <code>StateGraph</code> built by <code>build_graph()</code> in <code>backend/app/graph.py</code>. It has 7 nodes and 11 edges. One graph serves both request types: <code>guard_in</code> reads <code>mode</code> and sends each run down the report path or the chat path.</p>
+  </header>
+
+  <div class="legend" aria-label="Legend">
+    <span><i class="swatch sw-report"></i>report path</span>
+    <span><i class="swatch sw-chat"></i>chat path</span>
+    <span><i class="swatch sw-cond"></i>conditional edge (chosen by <code>after_guard_in</code>)</span>
+  </div>
+
+  <figure>
+    <div class="fig-scroll">
+    <svg viewBox="0 0 800 640" role="img" aria-label="LangGraph structure: START to guard_in. guard_in branches conditionally: report mode fans out in parallel to market_node and filings_node, which join at compose; chat mode goes to router then chat_answer; a refused injection goes straight to guard_out. compose and chat_answer both lead to guard_out, then END.">
+      <defs>
+        <marker id="ar" class="mk-report" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+        <marker id="ac" class="mk-chat" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+        <marker id="ab" class="mk-both" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+      </defs>
+
+      <!-- checkpoint boundary -->
+      <rect class="frame" x="22" y="84" width="770" height="490" rx="8"/>
+      <text class="frame-t" x="34" y="104">StateGraph(GraphState)</text>
+      <text class="frame-t" x="34" y="119">SqliteSaver checkpoint per thread_id</text>
+
+      <!-- edges -->
+      <path class="e e-both" d="M400,63 V101" marker-end="url(#ab)"/>
+      <!-- guard_in fan-out (report) -->
+      <path class="e e-report cond" d="M350,157 V195 H160 V231" marker-end="url(#ar)"/>
+      <path class="e e-report cond" d="M400,157 V231" marker-end="url(#ar)"/>
+      <text class="lbl l-report" x="255" y="187" text-anchor="middle">mode = report · parallel</text>
+      <!-- guard_in → router (chat) -->
+      <path class="e e-chat cond" d="M450,157 V195 H650 V231" marker-end="url(#ac)"/>
+      <text class="lbl l-chat" x="560" y="187" text-anchor="middle">mode = chat</text>
+      <!-- guard_in → guard_out (refused) -->
+      <path class="e e-chat cond" d="M498,130 H770 V520 H500" marker-end="url(#ac)"/>
+      <text class="lbl l-chat" x="760" y="478" text-anchor="end">injection refused</text>
+      <text class="lbl l-chat" x="760" y="493" text-anchor="end">(skip router)</text>
+      <!-- join -->
+      <path class="e e-report" d="M160,287 V325 H240 V361" marker-end="url(#ar)"/>
+      <path class="e e-report" d="M400,287 V325 H320 V361" marker-end="url(#ar)"/>
+      <text class="lbl l-report" x="150" y="350" text-anchor="end">join: waits</text>
+      <text class="lbl l-report" x="150" y="364" text-anchor="end">for both</text>
+      <!-- router → chat_answer -->
+      <path class="e e-chat" d="M650,287 V361" marker-end="url(#ac)"/>
+      <text class="lbl l-chat" x="640" y="320" text-anchor="end">market · filings</text>
+      <text class="lbl l-chat" x="640" y="335" text-anchor="end">both · off_topic</text>
+      <!-- into guard_out -->
+      <path class="e e-report" d="M280,417 V455 H350 V491" marker-end="url(#ar)"/>
+      <text class="lbl l-report" x="290" y="447">Report</text>
+      <path class="e e-chat" d="M650,417 V455 H450 V491" marker-end="url(#ac)"/>
+      <text class="lbl l-chat" x="560" y="447" text-anchor="middle">ChatAnswer</text>
+      <path class="e e-both" d="M400,547 V593" marker-end="url(#ab)"/>
+
+      <!-- terminals -->
+      <rect class="term" x="350" y="33" width="100" height="30" rx="15"/>
+      <text class="term-t" x="400" y="52" text-anchor="middle">START</text>
+      <rect class="term" x="350" y="595" width="100" height="30" rx="15"/>
+      <text class="term-t" x="400" y="614" text-anchor="middle">END</text>
+
+      <!-- nodes -->
+      <g>
+        <rect class="n-box" x="302" y="103" width="196" height="54" rx="6"/>
+        <text class="n-name" x="400" y="126" text-anchor="middle">guard_in</text>
+        <text class="n-sub" x="400" y="143" text-anchor="middle">SEC ticker check · injection check</text>
+      </g>
+      <g>
+        <rect class="n-box n-report" x="62" y="233" width="196" height="54" rx="6"/>
+        <text class="n-name" x="160" y="256" text-anchor="middle">market_node</text>
+        <text class="n-sub" x="160" y="273" text-anchor="middle">Alpha Vantage quote + overview</text>
+      </g>
+      <g>
+        <rect class="n-box n-report" x="302" y="233" width="196" height="54" rx="6"/>
+        <text class="n-name" x="400" y="256" text-anchor="middle">filings_node</text>
+        <text class="n-sub" x="400" y="273" text-anchor="middle">EDGAR → Chroma → summary</text>
+      </g>
+      <g>
+        <rect class="n-box n-chat" x="552" y="233" width="196" height="54" rx="6"/>
+        <text class="n-name" x="650" y="256" text-anchor="middle">router</text>
+        <text class="n-sub" x="650" y="273" text-anchor="middle">Haiku → RouteDecision</text>
+      </g>
+      <g>
+        <rect class="n-box n-report" x="182" y="363" width="196" height="54" rx="6"/>
+        <text class="n-name" x="280" y="386" text-anchor="middle">compose</text>
+        <text class="n-sub" x="280" y="403" text-anchor="middle">build Report · no LLM</text>
+      </g>
+      <g>
+        <rect class="n-box n-chat" x="552" y="363" width="196" height="54" rx="6"/>
+        <text class="n-name" x="650" y="386" text-anchor="middle">chat_answer</text>
+        <text class="n-sub" x="650" y="403" text-anchor="middle">market / filings agents (Sonnet)</text>
+      </g>
+      <g>
+        <rect class="n-box" x="302" y="493" width="196" height="54" rx="6"/>
+        <text class="n-name" x="400" y="516" text-anchor="middle">guard_out</text>
+        <text class="n-sub" x="400" y="533" text-anchor="middle">advice + grounding checks</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Every run enters at <code>guard_in</code> and leaves through <code>guard_out</code>. Both ends are shared, so the input and output checks cover both paths. Only the branches in between depend on <code>mode</code>. The dashed edges are the four targets <code>after_guard_in</code> can return. <code>market_node</code> and <code>filings_node</code> run as one parallel step, and <code>compose</code> waits for both.</figcaption>
+  </figure>
+
+  <section>
+    <h2>How a run moves</h2>
+    <div class="paths">
+      <div class="path report">
+        <h3>Report · <code>POST /api/report</code></h3>
+        <ol>
+          <li><code>guard_in</code> checks the ticker exists at the SEC. An unknown ticker raises <code>TickerNotFoundError</code>, which returns a 404 before any spend.</li>
+          <li><code>market_node</code> and <code>filings_node</code> run in parallel. Each one catches its own failures and writes a warning, so one failed source still gives a partial report.</li>
+          <li><code>compose</code> builds the <code>Report</code> and resets chat history.</li>
+          <li><code>guard_out</code> drops claims that give advice or have uncited or unknown citations, and adds a warning for each.</li>
+        </ol>
+      </div>
+      <div class="path chat">
+        <h3>Chat · <code>POST /api/chat</code></h3>
+        <ol>
+          <li><code>run_chat</code> returns a 409 if the thread has no stored report yet.</li>
+          <li><code>guard_in</code> refuses injection attempts. A refusal goes straight to <code>guard_out</code>.</li>
+          <li><code>router</code> (Haiku) picks market, filings, both or off_topic.</li>
+          <li><code>chat_answer</code> calls one or both agents. For <code>both</code>, it concatenates the answers under headings. off_topic returns a polite refusal without calling an agent.</li>
+          <li><code>guard_out</code> runs the advice check (regex plus Haiku) and checks filings citations, then appends the turn to <code>history</code>.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Nodes</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Node</th><th>Path</th><th>Calls</th><th>Writes to state</th></tr></thead>
+        <tbody>
+          <tr><td>guard_in</td><td><span class="pill both">both</span></td><td><code>resolve_company</code> (report) · <code>detect_injection</code> (chat)</td><td><code>company_name</code>, or <code>refused</code> + <code>last_answer</code></td></tr>
+          <tr><td>market_node</td><td><span class="pill report">report</span></td><td><code>get_market_snapshot</code> (WS1)</td><td><code>snapshot</code>, <code>market_warning</code></td></tr>
+          <tr><td>filings_node</td><td><span class="pill report">report</span></td><td><code>ingest_recent_filings</code> (WS2) → <code>summarize_filings</code> (WS3, Sonnet)</td><td><code>filings</code>, <code>filings_warning</code></td></tr>
+          <tr><td>compose</td><td><span class="pill report">report</span></td><td>none (no LLM call)</td><td><code>report</code>, <code>history = []</code></td></tr>
+          <tr><td>router</td><td><span class="pill chat">chat</span></td><td><code>llm.parse("fast", …, RouteDecision)</code></td><td><code>route</code></td></tr>
+          <tr><td>chat_answer</td><td><span class="pill chat">chat</span></td><td><code>answer_market_question</code> and/or <code>answer_filings_question</code></td><td><code>last_answer</code></td></tr>
+          <tr><td>guard_out</td><td><span class="pill both">both</span></td><td><code>check_summary</code> (report) · <code>check_chat_answer</code> (chat)</td><td><code>report</code> or <code>last_answer</code>, <code>history</code>, <code>warnings</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Nodes and edges come from <code>build_graph(stub_deps(), MemorySaver()).get_graph()</code> on <code>main</code>, as of <code>graph.py</code>'s latest commit, <code>57f640a</code>. Market and filings each write their own warning key, so the parallel join doesn't need a reducer.</footer>
+</div>
+</body>
+</html>
