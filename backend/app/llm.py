@@ -46,6 +46,27 @@ class LLMError(Exception):
     """The model returned no usable output (refusal, max_tokens, unparsable)."""
 
 
+def _transient(fn):
+    """Map provider outages (429, 5xx/529, network) to LLMError so the API returns 503
+    instead of 500. Request bugs (400/401/404) still raise: those are ours to fix."""
+    import functools
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        import anthropic
+
+        try:
+            return fn(*args, **kwargs)
+        except anthropic.APIConnectionError as e:
+            raise LLMError(f"model unreachable: {e}") from e
+        except anthropic.APIStatusError as e:
+            if e.status_code == 429 or e.status_code >= 500:
+                raise LLMError(f"model unavailable ({e.status_code})") from e
+            raise
+
+    return wrapper
+
+
 class AnthropicLLM:
     def __init__(self, client: Any | None = None):
         if client is None:
@@ -55,6 +76,7 @@ class AnthropicLLM:
         self._client = client
 
     @traceable(run_type="llm", name="llm.parse")
+    @_transient
     def parse(self, role: ModelRole, system: str, messages: list[dict], schema: type[T]) -> T:
         resp = self._client.messages.parse(
             model=MODELS[role],
@@ -68,6 +90,7 @@ class AnthropicLLM:
         return resp.parsed_output
 
     @traceable(run_type="llm", name="llm.text")
+    @_transient
     def text(self, role: ModelRole, system: str, messages: list[dict]) -> str:
         resp = self._client.messages.create(
             model=MODELS[role],
@@ -80,6 +103,7 @@ class AnthropicLLM:
         return "".join(b.text for b in resp.content if b.type == "text")
 
     @traceable(run_type="chain", name="llm.run_tools")
+    @_transient
     def run_tools(
         self, role: ModelRole, system: str, messages: list[dict], tools: list[Any]
     ) -> str:

@@ -1,11 +1,12 @@
 """HTTP API (spec §3.4). Routes/response models frozen; internals run the WS4 graph.
 
 Run: cd backend && uv run uvicorn app.api:app --port 8000
-Default deps = stub_deps() with an offline stub LLM until Phase 2 wires real_deps().
+Default deps = real_deps(); APP_MODE=stub serves fixture data with an offline stub LLM.
 """
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import uuid
 
@@ -16,7 +17,7 @@ from fastapi.responses import JSONResponse
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from app.config import data_dir
-from app.contracts import AgentDeps, stub_deps
+from app.contracts import AgentDeps, real_deps, stub_deps
 from app.graph import NoReportYetError, build_graph, run_chat, run_report
 from app.guardrails import AdviceCheck
 from app.llm import LLMError
@@ -63,8 +64,17 @@ def default_checkpointer() -> SqliteSaver:
     return SqliteSaver(sqlite3.connect(data_dir() / "checkpoints.sqlite", check_same_thread=False))
 
 
+def stub_mode_deps() -> AgentDeps:
+    """Fixture-backed, keyless, offline. Used when APP_MODE=stub (tests, frontend dev)."""
+    return stub_deps(llm=_StubModeLLM())
+
+
+def default_deps() -> AgentDeps:
+    return stub_mode_deps() if os.getenv("APP_MODE") == "stub" else real_deps()
+
+
 def create_app(deps: AgentDeps | None = None, checkpointer=None) -> FastAPI:
-    graph = build_graph(deps if deps is not None else stub_deps(llm=_StubModeLLM()),
+    graph = build_graph(deps if deps is not None else default_deps(),
                         checkpointer if checkpointer is not None else default_checkpointer())
     app = FastAPI(title="Financial Data Agent")
     app.state.graph = graph
@@ -115,4 +125,10 @@ def create_app(deps: AgentDeps | None = None, checkpointer=None) -> FastAPI:
     return app
 
 
-app = create_app()
+
+def __getattr__(name: str):
+    # Lazy `app` so importing this module (e.g. in tests) doesn't open the checkpoint DB or
+    # build real deps. `uvicorn app.api:app` still resolves it. APP_MODE=stub for fixture data.
+    if name == "app":
+        return create_app()
+    raise AttributeError(name)
