@@ -1,52 +1,75 @@
-"""PHASE 0 STUB API — routes and schemas per spec §3.4, fixture data only.
+"""HTTP API (spec §3.4). Routes/response models frozen; internals run the WS4 graph.
 
-WS4 replaces the internals (graph, checkpointer, guardrails) WITHOUT changing routes
-or response models. WS5 builds the UI against this.
 Run: cd backend && uv run uvicorn app.api:app --port 8000
+Default deps = stub_deps() with an offline stub LLM until Phase 2 wires real_deps().
 """
 
 from __future__ import annotations
 
+import sqlite3
 import uuid
-from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from langgraph.checkpoint.sqlite import SqliteSaver
 
-from app.contracts import (
-    fixture_retriever,
-    stub_answer_filings_question,
-    stub_ingest_recent_filings,
-    stub_market_snapshot,
-    stub_resolve_company,
-    stub_summarize_filings,
-)
+from app.config import data_dir
+from app.contracts import AgentDeps, stub_deps
+from app.graph import NoReportYetError, build_graph, run_chat, run_report
+from app.guardrails import AdviceCheck
+from app.llm import LLMError
 from app.models import (
     ChatAnswer,
     ChatRequest,
     CreateSessionResponse,
+    DataSourceError,
     ErrorResponse,
     Report,
     ReportRequest,
+    RouteDecision,
     TickerNotFoundError,
 )
 
+_ERRORS = {s: {"model": ErrorResponse} for s in (404, 409, 422, 503)}
+
 
 def _err(status: int, code: str, message: str) -> JSONResponse:
-    return JSONResponse(status_code=status, content=ErrorResponse(error_code=code, message=message).model_dump())
+    body = ErrorResponse(error_code=code, message=message).model_dump()
+    return JSONResponse(status_code=status, content=body)
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(title="Financial Data Agent (stub)")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:5173"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    reports: dict[str, Report] = {}  # thread_id -> last report (stub only; WS4 uses checkpointer)
+class _StubModeLLM:
+    """Offline LLM for the no-deps stub app (pre-Phase 2), mirroring the Phase 0 stub: every
+    chat routes to filings and nothing reads as advice. Keeps the stub app keyless for WS5 and
+    its tests network-free. Stub agents never call text()/run_tools()."""
+
+    def parse(self, role, system, messages, schema):
+        if schema is RouteDecision:
+            return RouteDecision(route="filings", reason="stub mode")
+        if schema is AdviceCheck:
+            return AdviceCheck(is_advice=False, reason="stub mode")
+        raise LLMError(f"stub mode: no LLM for {schema.__name__}")
+
+    def text(self, role, system, messages):
+        raise LLMError("stub mode: no LLM")
+
+    def run_tools(self, role, system, messages, tools):
+        raise LLMError("stub mode: no LLM")
+
+
+def default_checkpointer() -> SqliteSaver:
+    return SqliteSaver(sqlite3.connect(data_dir() / "checkpoints.sqlite", check_same_thread=False))
+
+
+def create_app(deps: AgentDeps | None = None, checkpointer=None) -> FastAPI:
+    graph = build_graph(deps if deps is not None else stub_deps(llm=_StubModeLLM()),
+                        checkpointer if checkpointer is not None else default_checkpointer())
+    app = FastAPI(title="Financial Data Agent")
+    app.state.graph = graph
+    app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"],
+                       allow_methods=["*"], allow_headers=["*"])
 
     @app.exception_handler(RequestValidationError)
     async def _invalid(_: Request, exc: RequestValidationError):
@@ -56,6 +79,23 @@ def create_app() -> FastAPI:
     async def _not_found(_: Request, exc: TickerNotFoundError):
         return _err(404, "ticker_not_found", str(exc))
 
+    @app.exception_handler(NoReportYetError)
+    async def _no_report(_: Request, exc: NoReportYetError):
+        return _err(409, "no_report_yet", "Generate a report for a ticker first.")
+
+    @app.exception_handler(Exception)
+    async def _internal(_: Request, exc: Exception):
+        # §3.4: all errors are ErrorResponse. Detail stays in server logs, not the body.
+        return _err(500, "internal_error", "Unexpected error; please retry.")
+
+    @app.exception_handler(DataSourceError)
+    async def _upstream(_: Request, exc: DataSourceError):
+        return _err(503, "upstream_unavailable", f"{exc.provider} unavailable: {exc}")
+
+    @app.exception_handler(LLMError)
+    async def _llm_down(_: Request, exc: LLMError):
+        return _err(503, "upstream_unavailable", f"Language model unavailable: {exc}")
+
     @app.get("/api/health")
     def health():
         return {"status": "ok"}
@@ -64,29 +104,13 @@ def create_app() -> FastAPI:
     def create_session():
         return CreateSessionResponse(thread_id=str(uuid.uuid4()))
 
-    @app.post("/api/report", response_model=Report)
+    @app.post("/api/report", response_model=Report, responses=_ERRORS)
     def report(req: ReportRequest):
-        _cik, name = stub_resolve_company(req.ticker)
-        filings = stub_ingest_recent_filings(req.ticker)
-        r = Report(
-            ticker=req.ticker,
-            company_name=name,
-            market=stub_market_snapshot(req.ticker),
-            filings=stub_summarize_filings(req.ticker, name, filings, fixture_retriever, None),
-            warnings=["Stub data: served from fixtures, not live sources."],
-            generated_at=datetime.now(UTC),
-        )
-        reports[req.thread_id] = r
-        return r
+        return run_report(graph, req.thread_id, req.ticker)
 
-    @app.post("/api/chat", response_model=ChatAnswer, responses={409: {"model": ErrorResponse}})
+    @app.post("/api/chat", response_model=ChatAnswer, responses=_ERRORS)
     def chat(req: ChatRequest):
-        r = reports.get(req.thread_id)
-        if r is None:
-            return _err(409, "no_report_yet", "Generate a report for a ticker first.")
-        a = stub_answer_filings_question(r.ticker, req.message, [], fixture_retriever, None)
-        return ChatAnswer(text=a.text, citations=a.citations, route="filings",
-                          warnings=["Stub answer."])
+        return run_chat(graph, req.thread_id, req.message)
 
     return app
 
