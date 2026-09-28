@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm frontend/src/App.css)",
+      "Bash(rm -rf frontend/src/assets)",
+      "Bash(git rm -r frontend/src/App.css)",
+      "Bash(git rm -r frontend/src/assets)"
+    ]
+  }
+}
