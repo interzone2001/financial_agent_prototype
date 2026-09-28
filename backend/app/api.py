@@ -70,7 +70,13 @@ def stub_mode_deps() -> AgentDeps:
 
 
 def default_deps() -> AgentDeps:
-    return stub_mode_deps() if os.getenv("APP_MODE") == "stub" else real_deps()
+    if os.getenv("APP_MODE") == "stub":
+        return stub_mode_deps()
+    # Load Chroma's ONNX embedding model at startup, not inside the first report request.
+    from app.vectorstore import warm_embedding_model
+
+    warm_embedding_model()
+    return real_deps()
 
 
 def create_app(deps: AgentDeps | None = None, checkpointer=None) -> FastAPI:
