@@ -9,8 +9,9 @@ from __future__ import annotations
 import os
 import sqlite3
 import uuid
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -32,6 +33,7 @@ from app.models import (
     RouteDecision,
     TickerNotFoundError,
 )
+from app.ratelimit import RateLimitedError, limiter_dependency
 
 _ERRORS = {s: {"model": ErrorResponse} for s in (404, 409, 422, 503)}
 
@@ -99,6 +101,10 @@ def create_app(deps: AgentDeps | None = None, checkpointer=None) -> FastAPI:
     async def _no_report(_: Request, exc: NoReportYetError):
         return _err(409, "no_report_yet", "Generate a report for a ticker first.")
 
+    @app.exception_handler(RateLimitedError)
+    async def _limited(_: Request, exc: RateLimitedError):
+        return _err(429, "rate_limited", str(exc))
+
     @app.exception_handler(Exception)
     async def _internal(_: Request, exc: Exception):
         # §3.4: all errors are ErrorResponse. Detail stays in server logs, not the body.
@@ -120,13 +126,25 @@ def create_app(deps: AgentDeps | None = None, checkpointer=None) -> FastAPI:
     def create_session():
         return CreateSessionResponse(thread_id=str(uuid.uuid4()))
 
-    @app.post("/api/report", response_model=Report, responses=_ERRORS)
+    report_limit = limiter_dependency("RATE_LIMIT_REPORTS_PER_HOUR", "reports")
+    chat_limit = limiter_dependency("RATE_LIMIT_CHATS_PER_HOUR", "chat messages")
+
+    @app.post("/api/report", response_model=Report, responses=_ERRORS,
+              dependencies=[Depends(report_limit)])
     def report(req: ReportRequest):
         return run_report(graph, req.thread_id, req.ticker)
 
-    @app.post("/api/chat", response_model=ChatAnswer, responses=_ERRORS)
+    @app.post("/api/chat", response_model=ChatAnswer, responses=_ERRORS,
+              dependencies=[Depends(chat_limit)])
     def chat(req: ChatRequest):
         return run_chat(graph, req.thread_id, req.message)
+
+    # Single-service deploy: serve the built React app from the same origin as /api.
+    dist = os.getenv("FRONTEND_DIST")
+    if dist and Path(dist, "index.html").exists():
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/", StaticFiles(directory=dist, html=True), name="frontend")
 
     return app
 
