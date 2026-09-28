@@ -216,10 +216,11 @@ All errors return `ErrorResponse`. CORS allows `http://localhost:5173`. Backend 
 
 - Flag: `LANGSMITH_TRACING=true` (+ `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`). Off in
   tests (`tests/conftest.py`).
-- LangGraph runs trace automatically. `AnthropicLLM` methods are `@traceable(run_type="llm")`
-  and the client is `wrap_anthropic`-ed (Phase 0 verified `wrap_anthropic` patches
-  `messages.create/stream` but not `messages.parse` or the tool runner — hence the
-  method-level decorator).
+- LangGraph runs trace automatically. `AnthropicLLM` methods are `@traceable(run_type="llm")`.
+  `wrap_anthropic` is NOT used (langsmith 0.14 + anthropic 1.x: crashes on
+  `client.completions`). Note: `@traceable` adds a keyword-only `config=None` to a
+  wrapped function's signature — contract/signature tests must compare
+  `inspect.unwrap(fn)`.
 - **Every workstream decorates its public functions and its data-source calls** with
   `from app.tracing import traceable`:
   - `run_type="chain"` agent/orchestration step (`market.answer_market_question`,

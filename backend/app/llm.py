@@ -1,8 +1,9 @@
 """LLM wrapper — the only module that imports `anthropic`. See spec §3.3.
 
 Agents take an `LLM` so tests can inject `tests.fakes.FakeLLM`. Every method is
-`@traceable`, so each call shows up in LangSmith when LANGSMITH_TRACING=true (the
-client is also `wrap_anthropic`-ed for token usage on the calls it can see).
+`@traceable`, so each call shows up in LangSmith when LANGSMITH_TRACING=true.
+(`langsmith.wrappers.wrap_anthropic` is NOT used: in langsmith 0.14 it touches
+`client.completions`, which anthropic 1.x removed, and crashes on construction.)
 """
 
 from __future__ import annotations
@@ -49,9 +50,8 @@ class AnthropicLLM:
     def __init__(self, client: Any | None = None):
         if client is None:
             import anthropic
-            from langsmith.wrappers import wrap_anthropic
 
-            client = wrap_anthropic(anthropic.Anthropic())
+            client = anthropic.Anthropic()
         self._client = client
 
     @traceable(run_type="llm", name="llm.parse")
