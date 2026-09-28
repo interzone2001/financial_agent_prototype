@@ -1,0 +1,171 @@
+{
+ "ticker": "AAPL",
+ "company_name": "Apple Inc.",
+ "market": {
+  "quote": {
+   "symbol": "AAPL",
+   "price": 255.46,
+   "change": 3.15,
+   "change_pct": 1.2485,
+   "volume": 46076258,
+   "latest_trading_day": "2026-09-25",
+   "source": {
+    "provider": "alpha_vantage",
+    "url": "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=REDACTED",
+    "retrieved_at": "2026-09-28T18:00:00Z",
+    "accession_no": null,
+    "form_type": null,
+    "filed_date": null,
+    "section": null,
+    "chunk_id": null
+   }
+  },
+  "overview": {
+   "symbol": "AAPL",
+   "name": "Apple Inc",
+   "sector": "TECHNOLOGY",
+   "industry": "ELECTRONIC COMPUTERS",
+   "market_cap": 3791234560000,
+   "pe_ratio": 38.87,
+   "week52_high": 260.1,
+   "week52_low": 169.21,
+   "description": "Apple Inc. is an American multinational technology company that designs, manufactures and markets smartphones, personal computers, tablets, wearables and accessories, and sells a variety of related services.",
+   "source": {
+    "provider": "alpha_vantage",
+    "url": "https://www.alphavantage.co/query?function=OVERVIEW&symbol=AAPL&apikey=REDACTED",
+    "retrieved_at": "2026-09-28T18:00:00Z",
+    "accession_no": null,
+    "form_type": null,
+    "filed_date": null,
+    "section": null,
+    "chunk_id": null
+   }
+  }
+ },
+ "filings": {
+  "ticker": "AAPL",
+  "company_name": "Apple Inc.",
+  "filings": [
+   {
+    "cik": "0000320193",
+    "accession_no": "0000320193-25-000079",
+    "form_type": "10-K",
+    "filed_date": "2025-10-31",
+    "report_date": null,
+    "primary_doc_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+    "items": []
+   },
+   {
+    "cik": "0000320193",
+    "accession_no": "0000320193-26-000020",
+    "form_type": "10-Q",
+    "filed_date": "2026-07-31",
+    "report_date": null,
+    "primary_doc_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000020/aapl-20260627.htm",
+    "items": []
+   },
+   {
+    "cik": "0000320193",
+    "accession_no": "0000320193-26-000018",
+    "form_type": "8-K",
+    "filed_date": "2026-07-30",
+    "report_date": null,
+    "primary_doc_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000018/aapl-20260730.htm",
+    "items": [
+     "2.02",
+     "9.01"
+    ]
+   }
+  ],
+  "key_developments": [
+   {
+    "text": "Stub: key development from the latest 10-Q MD&A.",
+    "citations": [
+     "0000320193-26-000020:part1-item-2:0"
+    ]
+   }
+  ],
+  "risk_factors": [
+   {
+    "text": "Stub: risk factors summarised from the 10-K Item 1A.",
+    "citations": [
+     "0000320193-25-000079:item-1a:0",
+     "0000320193-25-000079:item-1a:1"
+    ]
+   }
+  ],
+  "financial_highlights": [
+   {
+    "text": "Stub: results of operations from the 10-K MD&A.",
+    "citations": [
+     "0000320193-25-000079:item-7:0"
+    ]
+   }
+  ],
+  "material_events": [
+   {
+    "text": "Stub: 8-K Item 2.02 reported quarterly results.",
+    "citations": [
+     "0000320193-26-000018:8k-items:0"
+    ]
+   }
+  ],
+  "citation_index": {
+   "0000320193-26-000020:part1-item-2:0": {
+    "provider": "sec_edgar",
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000020/aapl-20260627.htm",
+    "retrieved_at": "2026-09-28T18:00:00Z",
+    "accession_no": "0000320193-26-000020",
+    "form_type": "10-Q",
+    "filed_date": "2026-07-31",
+    "section": "Part I, Item 2. Management's Discussion and Analysis",
+    "chunk_id": "0000320193-26-000020:part1-item-2:0"
+   },
+   "0000320193-25-000079:item-1a:0": {
+    "provider": "sec_edgar",
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+    "retrieved_at": "2026-09-28T18:00:00Z",
+    "accession_no": "0000320193-25-000079",
+    "form_type": "10-K",
+    "filed_date": "2025-10-31",
+    "section": "Item 1A. Risk Factors",
+    "chunk_id": "0000320193-25-000079:item-1a:0"
+   },
+   "0000320193-25-000079:item-1a:1": {
+    "provider": "sec_edgar",
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+    "retrieved_at": "2026-09-28T18:00:00Z",
+    "accession_no": "0000320193-25-000079",
+    "form_type": "10-K",
+    "filed_date": "2025-10-31",
+    "section": "Item 1A. Risk Factors",
+    "chunk_id": "0000320193-25-000079:item-1a:1"
+   },
+   "0000320193-25-000079:item-7:0": {
+    "provider": "sec_edgar",
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+    "retrieved_at": "2026-09-28T18:00:00Z",
+    "accession_no": "0000320193-25-000079",
+    "form_type": "10-K",
+    "filed_date": "2025-10-31",
+    "section": "Item 7. Management's Discussion and Analysis",
+    "chunk_id": "0000320193-25-000079:item-7:0"
+   },
+   "0000320193-26-000018:8k-items:0": {
+    "provider": "sec_edgar",
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000018/aapl-20260730.htm",
+    "retrieved_at": "2026-09-28T18:00:00Z",
+    "accession_no": "0000320193-26-000018",
+    "form_type": "8-K",
+    "filed_date": "2026-07-30",
+    "section": "8-K Items 2.02,9.01",
+    "chunk_id": "0000320193-26-000018:8k-items:0"
+   }
+  }
+ },
+ "warnings": [
+  "Stub data: served from fixtures, not live sources."
+ ],
+ "disclaimer": "For informational purposes only. Not investment advice. Data from SEC EDGAR and Alpha Vantage; verify against original sources before acting.",
+ "generated_at": "2026-09-28T18:56:55.225665Z"
+}

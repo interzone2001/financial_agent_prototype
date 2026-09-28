@@ -1,0 +1,30 @@
+{
+ "text": "Stub filings answer. [0000320193-25-000079:item-1a:0] [0000320193-25-000079:item-1a:1]",
+ "citations": [
+  {
+   "provider": "sec_edgar",
+   "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+   "retrieved_at": "2026-09-28T18:00:00Z",
+   "accession_no": "0000320193-25-000079",
+   "form_type": "10-K",
+   "filed_date": "2025-10-31",
+   "section": "Item 1A. Risk Factors",
+   "chunk_id": "0000320193-25-000079:item-1a:0"
+  },
+  {
+   "provider": "sec_edgar",
+   "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+   "retrieved_at": "2026-09-28T18:00:00Z",
+   "accession_no": "0000320193-25-000079",
+   "form_type": "10-K",
+   "filed_date": "2025-10-31",
+   "section": "Item 1A. Risk Factors",
+   "chunk_id": "0000320193-25-000079:item-1a:1"
+  }
+ ],
+ "route": "filings",
+ "warnings": [
+  "Stub answer."
+ ],
+ "disclaimer": "For informational purposes only. Not investment advice. Data from SEC EDGAR and Alpha Vantage; verify against original sources before acting."
+}
