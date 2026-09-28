@@ -42,11 +42,14 @@ insider/13D filings, exhibits, charts, deployment.
 | Filings | **SEC EDGAR** (no key; `User-Agent` header required, ≤10 req/s) | Authoritative source |
 | API | **FastAPI** + Pydantic | |
 | UI | **Vite + React + TypeScript**, plain CSS | One page, no component lib |
+| Tracing | **LangSmith** (REQUIRED), toggled by `LANGSMITH_TRACING=true` | Every graph run, agent step, data-source call and LLM call is inspectable |
 | Python tooling | `uv`, Python 3.12, `pytest`, `ruff` | |
 
 Env vars (`.env`, never committed; `.env.example` is): `ANTHROPIC_API_KEY`,
 `ALPHA_VANTAGE_API_KEY`, `SEC_USER_AGENT` (e.g. `"FinAgentPrototype you@example.com"`),
-`DATA_DIR` (default `./data`).
+`DATA_DIR` (default `./data`), `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`,
+`LANGSMITH_PROJECT=financial-agent-prototype`. `.env` lives at the main repo root;
+each worktree gets a symlink to it (never copy keys).
 
 ## 3. Shared contracts (FROZEN after Phase 0 — owned by the integrator session)
 
@@ -209,6 +212,24 @@ All errors return `ErrorResponse`. CORS allows `http://localhost:5173`. Backend 
   form_type, filed_date (ISO str), section, url, chunk_idx`. Doc id = `chunk_id`.
 - `data/edgar/` — optional raw HTML cache keyed by accession.
 
+### 3.6 Tracing (LangSmith — REQUIRED)
+
+- Flag: `LANGSMITH_TRACING=true` (+ `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`). Off in
+  tests (`tests/conftest.py`).
+- LangGraph runs trace automatically. `AnthropicLLM` methods are `@traceable(run_type="llm")`
+  and the client is `wrap_anthropic`-ed (Phase 0 verified `wrap_anthropic` patches
+  `messages.create/stream` but not `messages.parse` or the tool runner — hence the
+  method-level decorator).
+- **Every workstream decorates its public functions and its data-source calls** with
+  `from app.tracing import traceable`:
+  - `run_type="chain"` agent/orchestration step (`market.answer_market_question`,
+    `filings.summarize_filings`, graph nodes), `"tool"` data source / retrieval
+    (`alpha_vantage.fetch`, `edgar.get_submissions`, `ingest.retrieve`), `"parser"`
+    guardrail checks. Name format: `"<module>.<function>"`.
+- Tracing must never leak secrets: no API keys in inputs/outputs (AV URLs are redacted).
+- Acceptance: with the flag on, one report run shows a single trace tree
+  `graph → market_node / filings_node → agent fns → tool calls / llm calls`.
+
 ## 4. Architecture
 
 ```
@@ -327,6 +348,12 @@ Behaviour:
   - Doc URL: `https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accession_no_nodash}/{primaryDocument}`.
 - Selection: latest `10-K`, latest `10-Q`, `8-K`s filed in last 90 days (max 5).
   Ignore amendments (`10-K/A`).
+- **8-K content lives in exhibits.** Phase 0 found the 8-K primary doc is mostly a
+  cover page ("press release attached as Exhibit 99.1"). Stretch task: also fetch
+  EX-99.x from the filing index (`…/{accession_nodash}/index.json`) and ingest with
+  section `"8-K Exhibit 99.1"`. Core requirement is the primary doc only.
+- 10-K/10-Q primary docs are inline-XBRL XHTML: BeautifulSoup emits
+  `XMLParsedAsHTMLWarning` — suppress it; still parse with `lxml`.
 - Text extraction: BeautifulSoup (`lxml`), drop `script/style` and inline-XBRL hidden
   `ix:header`; collapse whitespace.
 - Sectioning (10-K/10-Q): regex on `Item\s+(1A|1|2|3|7A|7)\.?` headings; the **table
