@@ -137,6 +137,9 @@ def ingest_recent_filings(ticker: str, *, client: edgar.EdgarClient | None = Non
     cik, _ = edgar.resolve_company(symbol, client=client)
     as_of = today or datetime.now(UTC).date()
     filings = edgar.select_filings(client.get_submissions(cik), cik, as_of)
+    if not filings:
+        raise DataSourceError(
+            "sec_edgar", f"no 10-K/10-Q/8-K filings found for {symbol} (foreign or non-periodic filer?)")
     stored: list[FilingMeta] = []
     for filing in filings:
         if vectorstore.has_accession(col, filing.accession_no):

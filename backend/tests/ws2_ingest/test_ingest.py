@@ -62,7 +62,16 @@ def test_unknown_tickers(edgar_api, client, collection):
     with pytest.raises(TickerNotFoundError):
         _ingest(client, collection, ticker="ZZZZZ")
     assert edgar_api.routes["submissions"].call_count == 0
-    assert retrieve("NOPE", "anything", collection=collection) == []
+    assert retrieve("ZZZZZ", "anything", collection=collection, client=client) == []
+
+def test_no_periodic_filings_raises(edgar_api, client, collection):
+    subs = json.loads(h.fixture_text("sec_submissions_AAPL.json"))
+    recent = subs["filings"]["recent"]
+    n = len(recent["form"])
+    recent["form"] = ["20-F" if i % 2 == 0 else "6-K" for i in range(n)]
+    edgar_api.routes["submissions"].respond(json=subs)
+    with pytest.raises(DataSourceError):
+        _ingest(client, collection)
 
 @pytest.mark.live
 def test_live_aapl_end_to_end(tmp_data_dir):
