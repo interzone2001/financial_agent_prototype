@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable
 from datetime import date, timedelta
@@ -69,6 +70,11 @@ class EdgarClient:
     def get_document(self, url: str) -> str:
         return self._get(url).text
 
+    @traceable(run_type="tool", name="edgar.get_filing_index")
+    def get_filing_index(self, cik: str, accession_no: str) -> list[str]:
+        data = self._get(f"{filing_base_url(cik, accession_no)}/index.json").json()
+        return [item["name"] for item in data["directory"]["item"]]
+
 
 @lru_cache(maxsize=1)
 def default_client() -> EdgarClient:
@@ -95,6 +101,14 @@ def filing_base_url(cik: str, accession_no: str) -> str:
 
 def doc_url(cik: str, accession_no: str, primary_document: str) -> str:
     return f"{filing_base_url(cik, accession_no)}/{primary_document}"
+
+
+EX_991_RE = re.compile(r"(?:exhibit|ex)[-_]?99[-_.]?0?1(?!\d).*\.html?$", re.IGNORECASE)
+
+
+def exhibit_991_url(names: list[str], cik: str, accession_no: str) -> str | None:
+    hit = next((n for n in names if EX_991_RE.search(n)), None)
+    return f"{filing_base_url(cik, accession_no)}/{hit}" if hit else None
 
 
 def select_filings(submissions: dict, cik: str, today: date) -> list[FilingMeta]:

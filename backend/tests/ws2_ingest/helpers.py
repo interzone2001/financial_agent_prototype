@@ -16,6 +16,7 @@ ACC_10K, ACC_10Q, ACC_8K = "0000320193-25-000079", "0000320193-26-000020", "0000
 URL_10K = f"{ARCH}/000032019325000079/aapl-20250927.htm"
 URL_10Q = f"{ARCH}/000032019326000020/aapl-20260627.htm"
 URL_8K = f"{ARCH}/000032019326000018/aapl-20260730.htm"
+INDEX_8K = f"{ARCH}/000032019326000018/index.json"
 
 # Synthetic 10-Q: TOC first; Part II Item 2 is LONGER than Part I Item 2 (MD&A), so a naive
 # "longest span" pick would grab share repurchases instead of MD&A.

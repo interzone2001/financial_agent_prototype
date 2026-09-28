@@ -5,6 +5,7 @@ import pytest
 import respx
 
 from tests.ws2_ingest.helpers import (
+    INDEX_8K,
     SUBMISSIONS_URL,
     TEN_Q_HTML,
     TICKERS_URL,
@@ -28,6 +29,7 @@ def edgar_api():
         mock.get(URL_10K, name="doc_10k").respond(text=fixture_text("sec_10k_AAPL_excerpt.html"))
         mock.get(URL_10Q, name="doc_10q").respond(text=TEN_Q_HTML)
         mock.get(URL_8K, name="doc_8k").respond(text=fixture_text("sec_8k_AAPL.html"))
+        mock.get(INDEX_8K, name="index_8k").respond(404)  # no exhibit unless a test says so
         yield mock
 
 
