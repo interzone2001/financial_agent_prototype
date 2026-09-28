@@ -63,3 +63,11 @@ def test_source_url_is_redacted():
     assert url.startswith("https://www.alphavantage.co/query?")
     assert "function=GLOBAL_QUOTE" in url and "symbol=BRK.B" in url
     assert url.endswith("apikey=REDACTED")
+
+
+@pytest.mark.parametrize("junk", ["NaN", "Infinity", "-inf"])
+def test_parse_overview_non_finite_numbers_become_none(junk):
+    body = load_fixture("av_overview_AAPL.json") | {
+        "MarketCapitalization": junk, "PERatio": junk, "52WeekHigh": junk}
+    o = parse_overview(body, T0)
+    assert (o.market_cap, o.pe_ratio, o.week52_high) == (None, None, None)

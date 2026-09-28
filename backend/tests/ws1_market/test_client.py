@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 
 import httpx
@@ -109,3 +110,29 @@ def test_api_key_never_in_source_url_or_cache(make_client, tmp_path):
         "SELECT key, body FROM av_cache").fetchall()
     assert {r[0] for r in rows} == {"GLOBAL_QUOTE:AAPL", "OVERVIEW:AAPL"}
     assert all(KEY not in r[0] + r[1] for r in rows)
+
+
+def test_unparseable_body_is_not_cached(make_client):
+    client, av = make_client(OVERVIEW={"Symbol": "XYZ"})  # non-empty, passes checks, no Name
+    for _ in range(2):
+        with pytest.raises(DataSourceError):
+            client.overview("XYZ")
+    assert av.count("OVERVIEW") == 2
+
+
+@pytest.mark.parametrize("quote", [
+    {"01. symbol": "XYZ", "05. price": None},
+    ["not", "a", "dict"],
+    "junk",
+])
+def test_junk_quote_shapes_are_data_source_errors(make_client, quote):
+    client, _ = make_client(GLOBAL_QUOTE={"Global Quote": quote})
+    with pytest.raises(DataSourceError):
+        client.quote("XYZ")
+
+
+def test_httpx_request_log_never_contains_key(make_client, caplog):
+    client, _ = make_client(GLOBAL_QUOTE=QUOTE)
+    with caplog.at_level(logging.DEBUG):
+        client.quote("AAPL")
+    assert KEY not in caplog.text

@@ -6,6 +6,8 @@ cache keys are "{function}:{symbol}", and error messages are scrubbed.
 
 from __future__ import annotations
 
+import logging
+import math
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
@@ -27,6 +29,9 @@ BASE_URL = "https://www.alphavantage.co/query"
 PROVIDER = "alpha_vantage"
 _MISSING = {"", "none", "-", "null", "n/a"}
 
+# httpx logs every request URL at INFO, and ours carries the API key.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 def source_url(function: str, symbol: str) -> str:
     query = urlencode({"function": function, "symbol": symbol, "apikey": "REDACTED"})
@@ -47,16 +52,17 @@ def _clean(value: object) -> str | None:
 def _opt_float(value: object) -> float | None:
     text = _clean(value)
     try:
-        return None if text is None else float(text)
+        value = None if text is None else float(text)
     except ValueError:
         return None
+    return value if value is None or math.isfinite(value) else None
 
 
 def _opt_int(value: object) -> int | None:
     text = _clean(value)
     try:
         return None if text is None else int(Decimal(text))
-    except InvalidOperation:
+    except (InvalidOperation, ValueError, OverflowError):  # junk, NaN, Infinity
         return None
 
 
@@ -73,7 +79,7 @@ def parse_quote(body: dict, retrieved_at: datetime) -> Quote:
             latest_trading_day=date.fromisoformat(q["07. latest trading day"]),
             source=_source("GLOBAL_QUOTE", symbol, retrieved_at),
         )
-    except (KeyError, ValueError, AttributeError) as e:  # pydantic ValidationError is a ValueError
+    except (KeyError, ValueError, TypeError, AttributeError) as e:  # pydantic ValidationError is a ValueError
         raise DataSourceError(PROVIDER, f"malformed GLOBAL_QUOTE response: {e!r}") from None
 
 
@@ -94,6 +100,8 @@ def parse_overview(body: dict, retrieved_at: datetime) -> Overview:
         source=_source("OVERVIEW", symbol, retrieved_at),
     )
 
+
+_PARSERS = {"GLOBAL_QUOTE": parse_quote, "OVERVIEW": parse_overview}
 
 TTL: dict[str, timedelta] = {
     "GLOBAL_QUOTE": timedelta(seconds=60),
@@ -138,8 +146,9 @@ class AlphaVantageClient:
             raise DataSourceError(PROVIDER, f"{function} {symbol}: non-JSON response") from None
         self._check(function, symbol, body)
         now = self._clock()
+        _PARSERS[function](body, now)  # raises on junk, so only parseable bodies are cached
         if self._cache is not None:
-            self._cache.set(key, body, now)  # only validated bodies are cached
+            self._cache.set(key, body, now)
         return body, now
 
     def _check(self, function: str, symbol: str, body: object) -> None:
