@@ -125,6 +125,23 @@ def build_records(ticker: str, filing: FilingMeta, sections: dict[str, str],
     return records
 
 
+def _exhibit_records(client: edgar.EdgarClient, ticker: str, filing: FilingMeta,
+                     now: datetime, max_chunks: int) -> list[ChunkRecord]:
+    """Best effort: any EDGAR failure or malformed index means no exhibit chunks."""
+    try:
+        names = client.get_filing_index(filing.cik, filing.accession_no)
+        url = edgar.exhibit_991_url(names, filing.cik, filing.accession_no)
+        if url is None:
+            return []
+        html = client.get_document(url)
+    except (DataSourceError, ValueError, KeyError, TypeError) as e:
+        log.warning("no EX-99.1 for %s: %s", filing.accession_no, e)
+        return []
+    exhibit = filing.model_copy(update={"primary_doc_url": url})
+    return build_records(ticker, exhibit, {"8-K Exhibit 99.1": html_to_text(html)}, now,
+                         max_chunks=max_chunks)
+
+
 @traceable(run_type="chain", name="ingest.ingest_recent_filings")
 def ingest_recent_filings(ticker: str, *, client: edgar.EdgarClient | None = None,
                           collection: Collection | None = None,
@@ -152,6 +169,8 @@ def ingest_recent_filings(ticker: str, *, client: edgar.EdgarClient | None = Non
             continue
         now = datetime.now(UTC)
         records = build_records(symbol, filing, filing_sections(filing, html), now)
+        if filing.form_type == "8-K" and (budget := MAX_CHUNKS_PER_FILING - len(records)) > 0:
+            records += _exhibit_records(client, symbol, filing, now, budget)
         vectorstore.add_records(col, records)
         stored.append(filing)
     if filings and not stored:
