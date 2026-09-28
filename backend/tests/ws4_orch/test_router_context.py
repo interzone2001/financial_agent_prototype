@@ -12,3 +12,9 @@ def test_router_includes_recent_turns():
 def test_router_without_history_unchanged_shape():
     content = router_messages("AAPL", "Apple Inc.", "price?")[0]["content"]
     assert "Recent conversation" not in content
+
+
+def test_router_prompt_keeps_conversation_followups_on_topic():
+    from app.prompts.router import ROUTER_SYSTEM
+
+    assert "summarize what we discussed" in ROUTER_SYSTEM and "on-topic" in ROUTER_SYSTEM
