@@ -6,11 +6,22 @@ cache keys are "{function}:{symbol}", and error messages are scrubbed.
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from urllib.parse import urlencode
 
-from app.models import DataSourceError, Overview, Quote, SourceRef
+import httpx
+
+from app.cache import Clock, SqliteCache, utc_now
+from app.models import (
+    DataSourceError,
+    Overview,
+    Quote,
+    RateLimitedError,
+    SourceRef,
+    TickerNotFoundError,
+)
+from app.tracing import traceable
 
 BASE_URL = "https://www.alphavantage.co/query"
 PROVIDER = "alpha_vantage"
@@ -82,3 +93,72 @@ def parse_overview(body: dict, retrieved_at: datetime) -> Overview:
         description=_clean(body.get("Description")),
         source=_source("OVERVIEW", symbol, retrieved_at),
     )
+
+
+TTL: dict[str, timedelta] = {
+    "GLOBAL_QUOTE": timedelta(seconds=60),
+    "OVERVIEW": timedelta(hours=24),
+}
+
+
+class AlphaVantageClient:
+    def __init__(
+        self,
+        api_key: str,
+        http: httpx.Client | None = None,
+        cache: SqliteCache | None = None,
+        clock: Clock = utc_now,
+    ):
+        self._api_key = api_key
+        self._http = http or httpx.Client(timeout=10.0)
+        self._cache = cache
+        self._clock = clock
+
+    def _redact(self, text: str) -> str:
+        return text.replace(self._api_key, "REDACTED") if self._api_key else text
+
+    @traceable(run_type="tool", name="alpha_vantage.fetch")
+    def fetch(self, function: str, symbol: str) -> tuple[dict, datetime]:
+        """Return (validated body, retrieved_at). Traced inputs are function+symbol only."""
+        key = f"{function}:{symbol}"
+        if self._cache is not None and (hit := self._cache.get(key, TTL[function])):
+            return hit
+        params = {"function": function, "symbol": symbol, "apikey": self._api_key}
+        try:
+            resp = self._http.get(BASE_URL, params=params)
+        except httpx.HTTPError as e:  # message/request carry the keyed URL: drop both
+            raise DataSourceError(
+                PROVIDER, f"{function} {symbol}: request failed ({type(e).__name__})"
+            ) from None
+        if resp.status_code != 200:
+            raise DataSourceError(PROVIDER, f"{function} {symbol}: HTTP {resp.status_code}")
+        try:
+            body = resp.json()
+        except ValueError:
+            raise DataSourceError(PROVIDER, f"{function} {symbol}: non-JSON response") from None
+        self._check(function, symbol, body)
+        now = self._clock()
+        if self._cache is not None:
+            self._cache.set(key, body, now)  # only validated bodies are cached
+        return body, now
+
+    def _check(self, function: str, symbol: str, body: object) -> None:
+        if not isinstance(body, dict):
+            raise DataSourceError(PROVIDER, f"{function} {symbol}: unexpected JSON shape")
+        for k in ("Note", "Information"):
+            if k in body:
+                raise RateLimitedError(PROVIDER, self._redact(f"Alpha Vantage limit: {body[k]}"))
+        if "Error Message" in body:
+            raise DataSourceError(
+                PROVIDER, self._redact(f"{function} {symbol}: {body['Error Message']}")
+            )
+        if function == "GLOBAL_QUOTE" and not body.get("Global Quote"):
+            raise TickerNotFoundError(symbol)
+        if function == "OVERVIEW" and not body:
+            raise TickerNotFoundError(symbol)
+
+    def quote(self, symbol: str) -> Quote:
+        return parse_quote(*self.fetch("GLOBAL_QUOTE", symbol))
+
+    def overview(self, symbol: str) -> Overview:
+        return parse_overview(*self.fetch("OVERVIEW", symbol))
