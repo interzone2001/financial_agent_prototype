@@ -12,9 +12,16 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.contracts import AgentDeps
-from app.guardrails import INJECTION_REFUSAL, check_chat_answer, check_summary, detect_injection
+from app.guardrails import (
+    INJECTION_REFUSAL,
+    OFF_TOPIC_REFUSAL,
+    check_chat_answer,
+    check_summary,
+    detect_injection,
+)
 from app.llm import LLMError
 from app.models import (
+    AgentAnswer,
     ChatAnswer,
     ChatTurn,
     DataSourceError,
@@ -106,7 +113,32 @@ def build_graph(deps: AgentDeps, checkpointer, *, llm_advice_check: bool = True
         return {"route": deps.llm.parse("fast", ROUTER_SYSTEM, msgs, RouteDecision).route}
 
     def chat_answer(state: GraphState) -> dict:
-        raise NotImplementedError("Task 3")
+        route, t, q = state["route"], state["ticker"], state["message"]
+        if route == "off_topic":
+            refusal = ChatAnswer(text=OFF_TOPIC_REFUSAL.format(ticker=t), route="off_topic")
+            return {"last_answer": refusal.model_dump(mode="json")}
+        report = Report.model_validate(state["report"])
+        history = [ChatTurn.model_validate(h) for h in state.get("history") or []]
+        parts: list[tuple[str, AgentAnswer]] = []
+        warnings: list[str] = []
+        if route in ("market", "both"):
+            if report.market is None:
+                warnings.append("Market data was unavailable for this report.")
+            else:
+                parts.append(("Market data",
+                              deps.answer_market_question(q, report.market, deps.llm)))
+        if route in ("filings", "both"):
+            parts.append(("SEC filings",
+                          deps.answer_filings_question(t, q, history, deps.retrieve, deps.llm)))
+        if not parts:
+            text = "Market data is unavailable for this report, so I can't answer that."
+        elif len(parts) == 1:
+            text = parts[0][1].text
+        else:
+            text = "\n\n".join(f"### {heading}\n{a.text}" for heading, a in parts)
+        answer = ChatAnswer(text=text, citations=[c for _, a in parts for c in a.citations],
+                            route=route, warnings=warnings)
+        return {"last_answer": answer.model_dump(mode="json")}
 
     def guard_out(state: GraphState) -> dict:
         if state["mode"] == "report":
