@@ -7,7 +7,7 @@ Claude), with follow-up chat remembered per session. Every fact carries its sour
 - Design spec: [`docs/superpowers/specs/2026-09-28-financial-agent-design.md`](docs/superpowers/specs/2026-09-28-financial-agent-design.md)
 - Workstream plans: [`docs/superpowers/plans/`](docs/superpowers/plans/)
 - E2E results: [`docs/e2e-2026-09-28.md`](docs/e2e-2026-09-28.md)
-- Business one-pager: [`docs/business/advisor-stock-briefing.pdf`](docs/business/advisor-stock-briefing.pdf)
+- Business one-pager: [`docs/business/advisor-stock-briefing__deck.pdf`](docs/business/advisor-stock-briefing__deck.pdf)
 
 ## Architecture
 
