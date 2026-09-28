@@ -83,6 +83,11 @@ def create_app(deps: AgentDeps | None = None, checkpointer=None) -> FastAPI:
     async def _no_report(_: Request, exc: NoReportYetError):
         return _err(409, "no_report_yet", "Generate a report for a ticker first.")
 
+    @app.exception_handler(Exception)
+    async def _internal(_: Request, exc: Exception):
+        # §3.4: all errors are ErrorResponse. Detail stays in server logs, not the body.
+        return _err(500, "internal_error", "Unexpected error; please retry.")
+
     @app.exception_handler(DataSourceError)
     async def _upstream(_: Request, exc: DataSourceError):
         return _err(503, "upstream_unavailable", f"{exc.provider} unavailable: {exc}")

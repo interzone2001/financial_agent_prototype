@@ -83,3 +83,13 @@ def test_empty_summary_warns():
     r = run_report(make_graph(summarize_filings=empty), "t1", "AAPL")
     assert r.filings is not None and r.filings.all_claims() == []
     assert any("No filing content could be retrieved" in w for w in r.warnings)
+
+
+def test_unexpected_branch_error_is_partial():
+    # e.g. an Anthropic 529 or Chroma error that isn't a DataSourceError/LLMError
+    r = run_report(make_graph(summarize_filings=raiser(RuntimeError("overloaded"))), "t1", "AAPL")
+    assert r.filings is None and r.market is not None
+    assert any("Filings unavailable" in w for w in r.warnings)
+    r = run_report(make_graph(get_market_snapshot=raiser(RuntimeError("boom"))), "t1", "AAPL")
+    assert r.market is None and r.filings is not None
+    assert any("Market data unavailable" in w for w in r.warnings)

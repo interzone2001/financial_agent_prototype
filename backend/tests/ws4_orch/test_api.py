@@ -96,3 +96,14 @@ def test_default_stub_app_is_offline(tmp_data_dir, monkeypatch):
     c.post("/api/report", json=AAPL)
     r = c.post("/api/chat", json={"thread_id": "t1", "message": "Main risks?"})
     assert r.status_code == 200 and r.json()["route"] == "filings" and r.json()["citations"]
+
+
+def test_unexpected_chat_error_is_error_response(tmp_data_dir):
+    app = create_app(deps_with(chat_llm("filings"),
+                               answer_filings_question=raiser(RuntimeError("secret detail"))),
+                     InMemorySaver())
+    c = TestClient(app, raise_server_exceptions=False)
+    c.post("/api/report", json=AAPL)
+    r = c.post("/api/chat", json={"thread_id": "t1", "message": "Risks?"})
+    _err(r, 500, "internal_error")
+    assert "secret detail" not in r.text

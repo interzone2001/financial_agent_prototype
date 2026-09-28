@@ -5,6 +5,7 @@ wraps them into nodes. State values are JSON dicts because the checkpoint serial
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Literal, TypedDict
 
@@ -32,6 +33,8 @@ from app.models import (
     TickerNotFoundError,
 )
 from app.prompts.router import ROUTER_SYSTEM, router_messages
+
+log = logging.getLogger(__name__)
 
 
 class NoReportYetError(Exception):
@@ -82,6 +85,10 @@ def build_graph(deps: AgentDeps, checkpointer, *, llm_advice_check: bool = True
             # SEC (guard_in) decides existence; an AV miss (e.g. ETF, no OVERVIEW) is partial.
             return {"snapshot": None,
                     "market_warning": f"No market data available for {state['ticker']}."}
+        except Exception as e:  # §4: one failed branch is a partial report, never a 500
+            log.exception("market_node failed for %s", state["ticker"])
+            return {"snapshot": None,
+                    "market_warning": f"Market data unavailable (internal error: {type(e).__name__})."}
         return {"snapshot": snap.model_dump(mode="json"), "market_warning": None}
 
     def filings_node(state: GraphState) -> dict:
@@ -92,6 +99,10 @@ def build_graph(deps: AgentDeps, checkpointer, *, llm_advice_check: bool = True
             summary = deps.summarize_filings(t, state["company_name"], metas, deps.retrieve, deps.llm)
         except (DataSourceError, LLMError) as e:
             return {"filings": None, "filings_warning": f"Filings unavailable: {e}"}
+        except Exception as e:  # e.g. Anthropic 429/529, Chroma: keep the market branch
+            log.exception("filings_node failed for %s", t)
+            return {"filings": None,
+                    "filings_warning": f"Filings unavailable (internal error: {type(e).__name__})."}
         return {"filings": summary.model_dump(mode="json"), "filings_warning": None}
 
     def compose(state: GraphState) -> dict:
@@ -151,9 +162,10 @@ def build_graph(deps: AgentDeps, checkpointer, *, llm_advice_check: bool = True
         answer = ChatAnswer.model_validate(state["last_answer"])
         if not state.get("refused"):
             answer = check_chat_answer(answer, deps.llm if llm_advice_check else None)
-        history = [*(state.get("history") or []),
-                   ChatTurn(role="user", content=state["message"]).model_dump(),
-                   ChatTurn(role="assistant", content=answer.text).model_dump()]
+        history = list(state.get("history") or [])
+        if not state.get("refused"):  # never replay a refused injection to later agent calls
+            history += [ChatTurn(role="user", content=state["message"]).model_dump(),
+                        ChatTurn(role="assistant", content=answer.text).model_dump()]
         return {"last_answer": answer.model_dump(mode="json"), "history": history,
                 "warnings": answer.warnings}
 

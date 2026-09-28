@@ -17,6 +17,8 @@ from app.tracing import traceable
 
 SECTIONS = ("key_developments", "risk_factors", "financial_highlights", "material_events")
 _TRADE = r"(?:buy|sell|hold|invest|purchase|short|accumulate|trim)"
+_TRADE_ING = (r"(?:buy(?:ing)?|sell(?:ing)?|hold(?:ing)?|invest(?:ing)?|purchas(?:e|ing)"
+              r"|short(?:ing)?|accumulat(?:e|ing)|trim(?:ming)?)")
 
 INJECTION_PATTERNS = [
     (r"\b(?:ignore|disregard|forget|override)\s+(?:(?:all|any|the|your|of)\s+)*"
@@ -32,19 +34,24 @@ INJECTION_PATTERNS = [
     r"\bnew\s+instructions\s*:",
 ]
 ADVICE_PATTERNS = [
-    (rf"\b(?:you|investors?|clients?|advisors?|one)\s+(?:should|must|ought\s+to|might\s+want\s+to)"
-     rf"\s+(?:consider\s+)?{_TRADE}\b"),
+    # Subjects exclude "clients"/"advisors": wealth-management 10-Ks state their obligations
+    # ("Financial advisors must hold a Series 7 license").
+    (r"\b(?:you|investors?|one)\s+(?:should|must|ought\s+to|may|might|could)"
+     rf"(?:\s+want\s+to)?\s+(?:consider\s+)?{_TRADE_ING}\b"),
     rf"\bshould\s+(?:i|we|you)\s+{_TRADE}\b",
-    (r"\b(?:i|we)(?:'d|\s+would)?\s+(?:recommend|suggest|advise)\s+"
-     r"(?:buying|selling|holding|investing|purchasing|shorting)\b"),
+    (r"\b(?:i|we)(?:'d|\s+would)?\s+(?:recommend|suggest|advise)\s+(?:that\s+)?"
+     rf"(?:(?:you|investors?)\s+)?{_TRADE_ING}\b"),
+    rf"\b(?:i|we)(?:'d|\s+would)\s+{_TRADE}\b",
+    rf"(?:^|[.!?]\s+)consider\s+{_TRADE_ING}\b",  # imperative only, not "the Board may consider"
+    r"\b(?:is|as)\s+an?\s+(?:strong\s+)?(?:buy|sell)\b(?!-)",
     r"\b(?:buy|sell|hold)\s+(?:rating|recommendation)\b",
     r"\bstrong\s+(?:buy|sell)\b",
     r"\bprice\s+target\b",
     r"\b(?:go|going|stay|be)\s+(?:overweight|underweight)\b",
-    (r"\b(?:is|looks|seems)\s+(?:like\s+)?(?:an?\s+)?(?:good|great|attractive|compelling|bad|poor)"
-     r"\s+(?:buy|investment|entry\s+point)\b"),
-    r"\b(?:good|right|great)\s+time\s+to\s+(?:buy|sell)\b",
-    r"\b(?:buy|sell)\s+(?:it\s+)?now\b",
+    (r"(?:\b(?:is|looks|seems)|'s)\s+(?:like\s+)?(?:an?\s+)?"
+     r"(?:good|great|attractive|compelling|bad|poor)\s+(?:buy|investment|entry\s+point)\b"),
+    r"\b(?:good|right|great|the)\s+time\s+to\s+(?:buy|sell)\b",
+    r"\b(?:buy|sell)\s+(?:it\s+)?now\b(?!-)",
 ]
 _INJECTION_RE = re.compile("|".join(f"(?:{p})" for p in INJECTION_PATTERNS),
                            re.IGNORECASE | re.MULTILINE)

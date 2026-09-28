@@ -39,7 +39,11 @@ def test_injection_false_positives(text):
     "We recommend buying the stock.", "Analysts have a strong buy on the shares.",
     "It carries a hold rating.", "Our price target is $250.",
     "AAPL looks like a good investment right now.", "Now is a good time to buy.",
-    "Should you buy it? Yes.", "I'd go overweight Apple."])
+    "Should you buy it? Yes.", "I'd go overweight Apple.",
+    # review finding 3: common advisory phrasings
+    "AAPL is a buy.", "It's a good investment.", "I'd recommend you buy AAPL.",
+    "Consider buying AAPL on dips.", "I would buy AAPL here.", "You may want to buy AAPL.",
+    "Investors could consider selling.", "Now is the time to buy."])
 def test_advice_detected(text):
     assert contains_advice(text)
 
@@ -50,7 +54,13 @@ def test_advice_detected(text):
     "The Company repurchased $90 billion of common stock under its buyback program.",
     "Holders of record numbered approximately 23,000.", "Customers may choose to buy AppleCare.",
     "Net sales in the Americas held steady.", "Investors should read the risk factors carefully.",
-    ADVICE_REFUSAL])
+    ADVICE_REFUSAL,
+    # review finding 4: wealth-management filing language and corporate actions
+    "Financial advisors must hold a Series 7 license.",
+    "Clients must invest a minimum of $100,000 in managed accounts.",
+    "The Company may sell now-discontinued models through resellers.",
+    "The Board may consider selling the division.", "It takes time to sell excess inventory.",
+    "This is a sell-through metric.", "One should investigate the risk factors."])
 def test_advice_false_positives(text):
     assert not contains_advice(text)
 
